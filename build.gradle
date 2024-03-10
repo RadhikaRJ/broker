@@ -1,0 +1,37 @@
+plugins {
+	id 'groovy'
+	id 'java'
+	id 'org.springframework.boot' version '3.2.3'
+	id 'io.spring.dependency-management' version '1.1.4'
+}
+
+group = 'com.broker'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	sourceCompatibility = '17'
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.codehaus.groovy:groovy-all:3.0.9'
+	testImplementation 'junit:junit:4.12'
+
+	implementation 'org.springframework.boot:spring-boot-starter'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+	implementation 'com.fasterxml.jackson.core:jackson-databind'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+	implementation 'com.amazonaws:aws-java-sdk-ec2:1.12.666'
+	implementation 'com.amazonaws:aws-java-sdk-bom:1.12.666'
+	implementation 'org.json:json:20210307'
+	implementation 'javax.servlet:javax.servlet-api:4.0.1' // Adjust version as needed
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}

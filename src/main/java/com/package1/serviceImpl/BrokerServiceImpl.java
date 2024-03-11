@@ -17,24 +17,24 @@ public class BrokerServiceImpl implements BrokerService {
     RestTemplate restTemplate;
 
     @Override
-    public boolean notify (List<SubscriberModel> subscribers, EventData event){
+    public boolean notify(List<SubscriberModel> subscribers, EventData event) {
 
         boolean flag = false;
 
         for (SubscriberModel node : subscribers) {
-            String url = "http://" + node.getUrl() + ":" + node.getPort() + "/notify";
+            String url = "http://" + node.getUrl() + ":" + "8081" + "/notify";
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<EventData> requestEntity = new HttpEntity<>(event,headers);
+            HttpEntity<EventData> requestEntity = new HttpEntity<>(event, headers);
             System.out.println("Sending eventId " + event.getEventId() + " to subscriber " +
-                    node.getSubscriberId() + " at url " + url +" to port " +node.getPort());
+                    node.getSubscriberId() + " at url " + url + " to port " + node.getPort());
             HttpStatus statusCode;
             try {
                 ResponseEntity<HttpStatus> responseEntity = restTemplate.exchange(url,
-                        HttpMethod.POST,requestEntity,HttpStatus.class);
+                        HttpMethod.POST, requestEntity, HttpStatus.class);
                 statusCode = responseEntity.getBody();
             } catch (Exception e) {
-                System.out.println("Error while notifying to subscriber id : "+node.getSubscriberId()
+                System.out.println("Error while notifying to subscriber id : " + node.getSubscriberId()
                         + "::error is " + ":::" + e.getMessage());
                 statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
             }
@@ -42,7 +42,7 @@ public class BrokerServiceImpl implements BrokerService {
             if (!statusCode.equals(HttpStatus.OK)) {
                 flag = false;
                 break;
-            }else{
+            } else {
                 flag = true;
             }
 

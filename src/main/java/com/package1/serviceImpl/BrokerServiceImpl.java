@@ -22,7 +22,7 @@ public class BrokerServiceImpl implements BrokerService {
         boolean flag = false;
 
         for (SubscriberModel node : subscribers) {
-            String url = "http://" + node.getUrl() + ":" + "8081" + "/notify";
+            String url = "http://" + node.getUrl() + ":" + node.getPort() + "/notify";
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<EventData> requestEntity = new HttpEntity<>(event, headers);

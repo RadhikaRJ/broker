@@ -23,6 +23,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import com.package1.controller.BrokerNodeController;
 
 import org.json.JSONObject;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,6 +37,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 
 @RestController
+@CrossOrigin(origins = "*")
 public class BrokerNodeController {
     // private HashMap<String, String> publisherStatusMap = new HashMap<>();
     // //commented by Radhika to try out bug fix
@@ -53,7 +55,6 @@ public class BrokerNodeController {
     // data. So we need to have a set of eventdata here.
 
     // Constructor
-
     /*
      * public BrokerNodeController() {
      * this.publisherSubscriberMap = new ConcurrentHashMap<>();
@@ -75,7 +76,6 @@ public class BrokerNodeController {
      * 
      * }
      */
-
     // added @Manjula Mynampati
     private final ReentrantLock lock = new ReentrantLock();
 
@@ -450,30 +450,86 @@ public class BrokerNodeController {
      * }
      */
 
+    /*
+     * @Scheduled(fixedRate = 60000) // 60 seconds = 1 minute
+     * public void checkAndNotifySubscribers() {
+     * 
+     * boolean isLeader = broker.isLeader();
+     * System.out.println("isLeader flag value: " + isLeader);
+     * if (isLeader) {
+     * publisherEventDataMap.forEach((publisherId, event) -> {
+     * if (event != null) {
+     * List<SubscriberModel> subscribers =
+     * publisherSubscriberMap.getOrDefault(publisherId,
+     * new ArrayList<>());
+     * 
+     * if (!subscribers.isEmpty()) {
+     * boolean success = notifySubscriber(subscribers, event);
+     * 
+     * lock.lock();
+     * try {
+     * if (success) {
+     * // Remove the event after successfully notifying subscribers
+     * publisherEventDataMap.compute(publisherId, (key, value) -> null);
+     * System.out.println("Notified subscribers for event from publisher: " +
+     * publisherId);
+     * 
+     * boolean result = sendEventDataToPeerBrokers(publisherEventDataMap); //
+     * Consistency &
+     * // Replication
+     * 
+     * if (result) {
+     * System.out.println("Successfully sent publisherEventDataMap to peer brokers"
+     * );
+     * } else {
+     * System.out.
+     * println("Failed to notify peer brokers about publisherEventDataMap");
+     * }
+     * } else {
+     * System.out.println(
+     * "Failed to notify subscribers for event from publisher: " + publisherId);
+     * }
+     * } catch (Exception e) {
+     * e.printStackTrace();
+     * } finally {
+     * lock.unlock();
+     * }
+     * }
+     * } else {
+     * System.out.println("No Events to be posted: ");
+     * }
+     * });
+     * }
+     * 
+     * }
+     */
+
     @Scheduled(fixedRate = 60000) // 60 seconds = 1 minute
     public void checkAndNotifySubscribers() {
 
         boolean isLeader = broker.isLeader();
         System.out.println("isLeader flag value: " + isLeader);
         if (isLeader) {
-            publisherEventDataMap.forEach((publisherId, event) -> {
+            Iterator<Map.Entry<String, EventData>> iterator = publisherEventDataMap.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<String, EventData> entry = iterator.next();
+                String publisherId = entry.getKey();
+                EventData event = entry.getValue();
+
                 if (event != null) {
+
                     List<SubscriberModel> subscribers = publisherSubscriberMap.getOrDefault(publisherId,
                             new ArrayList<>());
-
                     if (!subscribers.isEmpty()) {
                         boolean success = notifySubscriber(subscribers, event);
-
                         lock.lock();
                         try {
                             if (success) {
                                 // Remove the event after successfully notifying subscribers
-                                publisherEventDataMap.compute(publisherId, (key, value) -> null);
+                                iterator.remove();
                                 System.out.println("Notified subscribers for event from publisher: " + publisherId);
-
                                 boolean result = sendEventDataToPeerBrokers(publisherEventDataMap); // Consistency &
                                                                                                     // Replication
-
                                 if (result) {
                                     System.out.println("Successfully sent publisherEventDataMap to peer brokers");
                                 } else {
@@ -483,6 +539,7 @@ public class BrokerNodeController {
                                 System.out.println(
                                         "Failed to notify subscribers for event from publisher: " + publisherId);
                             }
+
                         } catch (Exception e) {
                             e.printStackTrace();
                         } finally {
@@ -492,7 +549,8 @@ public class BrokerNodeController {
                 } else {
                     System.out.println("No Events to be posted: ");
                 }
-            });
+            }
+
         }
 
     }
@@ -912,7 +970,9 @@ public class BrokerNodeController {
             this.publisherStatusMap.clear();
             this.publisherStatusMap.putAll(receivedMap);
 
-            return ResponseEntity.ok("Received publisherStatusMap from lead broker. Updated successfully");
+            return ResponseEntity.ok("Received publisherStatusMap from lead broker. Updated successfully"); // Should be
+                                                                                                            // a log
+                                                                                                            // statement.
 
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -1000,11 +1060,12 @@ public class BrokerNodeController {
 
             if (successForSubscriberMap && successForStatusMap) {
                 System.out.println("Publisher: " + publisherId + "added to the broker system");
-                logger.log(Level.INFO, "Publisher: \" + publisherId + \"added to the broker system");
+                logger.log(Level.INFO, String.format("Publisher: %s added to the broker system", publisherId));
                 return ResponseEntity.status(HttpStatus.OK).body("Publisher added successfully");
             } else {
                 System.out.println("Publisher: " + publisherId + "could not be added to the broker system");
-                logger.log(Level.INFO, "Publisher: \" + publisherId + \"could not be added to the broker system");
+                logger.log(Level.INFO,
+                        String.format("Publisher: %s could not be added to the broker system", publisherId));
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("status error");
             }
 
@@ -1040,3 +1101,4 @@ public class BrokerNodeController {
         }
     }
 }
+// push event is not sending the event data to peer IP address

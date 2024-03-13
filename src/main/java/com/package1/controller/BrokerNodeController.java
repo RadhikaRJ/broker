@@ -850,6 +850,9 @@ public class BrokerNodeController {
                 System.out.println("/n");
                 System.out.println("Publisher ID: " + publisherId);
                 System.out.println("Subscribers: " + subscribers);
+                for (SubscriberModel subModel : subscribers) {
+                    logger.log(Level.INFO, "Subscriber ID : " + subModel.getSubscriberId());
+                }
                 System.out.println("/n");
             }
 
@@ -969,7 +972,7 @@ public class BrokerNodeController {
             }
             this.publisherStatusMap.clear();
             this.publisherStatusMap.putAll(receivedMap);
-
+            logger.log(Level.INFO, "publisherStatusMap is updated at peer node" + publisherStatusMap);
             return ResponseEntity.ok("Received publisherStatusMap from lead broker. Updated successfully"); // Should be
                                                                                                             // a log
                                                                                                             // statement.

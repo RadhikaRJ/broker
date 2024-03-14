@@ -22,6 +22,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 
 import com.package1.controller.BrokerNodeController;
 
+import org.codehaus.groovy.runtime.dgmimpl.arrays.IntegerArrayPutAtMetaMethod;
 import org.json.JSONObject;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -76,6 +77,7 @@ public class BrokerNodeController {
 
     @PostConstruct
     public void triggerRegistration() {
+
         // Create a sample Broker object with necessary information
         this.broker = new Broker();
 
@@ -86,6 +88,7 @@ public class BrokerNodeController {
         currentLeaderBrokerPrivateIP = getLeaderPrivateIPFromConfigServer();
 
         updateLeaderStatus();
+
     }
 
     public Broker getBroker() {
@@ -113,6 +116,7 @@ public class BrokerNodeController {
 
     @PostMapping("/register")
     public void registerWithConfigServer(@RequestBody Broker broker) {
+
         try {
             System.out.println("Registering broker node with Coordinator Server...");
             logger.log(Level.INFO, "Registering broker node with Coordinator Server...");
@@ -121,7 +125,7 @@ public class BrokerNodeController {
 
             broker.setIpAddress(privateIpAddress);
             broker.setPort(port); // Set the injected port 8080
-            broker.setUniqueId(50);
+            broker.setUniqueId(60);
 
             // Retrieve EC2 instance ID dynamically using AWS EC2 Metadata Service
             String ec2InstanceId = EC2MetadataUtils.getInstanceId();
@@ -153,7 +157,7 @@ public class BrokerNodeController {
     }
 
     @DeleteMapping("/deregister/{uniqueId}")
-    public void deregisterFromConfigServer(@PathVariable int uniqueId) {
+    public void deregisterFromConfigServer(@PathVariable Integer uniqueId) {
         System.out.println("Sending request to Coordinator Server to deregister broker with uniqueID: " + uniqueId
                 + " from Coordinator Server...");
         restTemplate.delete(configServerUrl + "/deregister-broker/" + uniqueId);
@@ -165,16 +169,20 @@ public class BrokerNodeController {
     @PostMapping("/updateLeaderIPAndCheckStatus")
     public void handleUpdateLeaderIPAndCheckStatus(@RequestBody String requestBody) {
         JSONObject jsonObject = new JSONObject(requestBody);
-        String newLeadBrokerPrivateIPAddress = jsonObject.getString("newLeadBrokerPrivateIPAddress");
+        if (jsonObject != null) {
+            String newLeadBrokerPrivateIPAddress = jsonObject.getString("newLeadBrokerPrivateIPAddress");
 
-        this.currentLeaderBrokerPrivateIP = newLeadBrokerPrivateIPAddress;
-        this.leaderIPCheckNeeded = true;
-        updateLeaderStatus();
+            this.currentLeaderBrokerPrivateIP = newLeadBrokerPrivateIPAddress;
+            this.leaderIPCheckNeeded = true;
+            updateLeaderStatus();
+        }
+
     }
 
     // Method to retrieve the private IP of the leader broker from config server
     private String getLeaderPrivateIPFromConfigServer() {
         // Make a GET request to the config server endpoint
+
         try {
             System.out.println("Requesting lead broker's private IP address at Coordinator server");
             String currleadBrokerPrivateIPAtConfigServer = restTemplate.getForObject(
@@ -337,6 +345,7 @@ public class BrokerNodeController {
         boolean isLeader = broker.isLeader();
 
         if (isLeader) {
+
             Iterator<Map.Entry<String, EventData>> iterator = publisherEventDataMap.entrySet().iterator();
             while (iterator.hasNext()) {
                 Map.Entry<String, EventData> entry = iterator.next();
@@ -344,7 +353,7 @@ public class BrokerNodeController {
                 EventData event = entry.getValue();
 
                 if (event != null) {
-
+                    long startTime = System.currentTimeMillis();
                     List<SubscriberModel> subscribers = publisherSubscriberMap.getOrDefault(publisherId,
                             new ArrayList<>());
                     if (!subscribers.isEmpty()) {
@@ -353,6 +362,10 @@ public class BrokerNodeController {
                         try {
                             if (success) {
                                 // Remove the event after successfully notifying subscribers
+                                long endTime = System.currentTimeMillis();
+                                long timeTaken = endTime - startTime;
+                                System.out.println(
+                                        "Time taken to send the event to the subscribers: " + timeTaken + " ms.");
                                 iterator.remove();
                                 System.out.println("Notified subscribers for event from publisher: " + publisherId);
                                 boolean result = sendEventDataToPeerBrokers(publisherEventDataMap); // Consistency &

@@ -6,8 +6,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.client.RestTemplate;
 
+import groovy.util.logging.Slf4j;
+
 @SpringBootApplication
 @EnableScheduling
+@Slf4j
 public class BrokerMain {
     public static void main(String[] args) {
         try {

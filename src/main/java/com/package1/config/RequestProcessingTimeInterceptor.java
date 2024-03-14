@@ -30,5 +30,6 @@ public class RequestProcessingTimeInterceptor implements HandlerInterceptor {
         long endTime = System.currentTimeMillis();
         long timeTaken = endTime - startTime; // ms
         logger.info("Request URL: {}, Time Taken: {} ms", request.getRequestURL().toString(), timeTaken);
+
     }
 }

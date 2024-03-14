@@ -39,44 +39,12 @@ import jakarta.annotation.PreDestroy;
 @RestController
 @CrossOrigin(origins = "*")
 public class BrokerNodeController {
-    // private HashMap<String, String> publisherStatusMap = new HashMap<>();
-    // //commented by Radhika to try out bug fix
+
     private ConcurrentHashMap<String, String> publisherStatusMap = new ConcurrentHashMap<>();
-    // copied from here---A
-    // edited by @Manjula Mynampati
-    // RestTemplate restTemplate = new RestTemplate();
-    // private boolean isCurrentLeadBroker = false; commented as not used
-    // updated below to concurrent hashmap
+
     private ConcurrentHashMap<String, List<SubscriberModel>> publisherSubscriberMap = new ConcurrentHashMap<>();
     private ConcurrentHashMap<String, EventData> publisherEventDataMap = new ConcurrentHashMap<>();
-    // Radhika:
-    // if publisher sends multiple data events before it is sent to subscribers, the
-    // earlier events will be lost and they will be overwritten by recent sent event
-    // data. So we need to have a set of eventdata here.
 
-    // Constructor
-    /*
-     * public BrokerNodeController() {
-     * this.publisherSubscriberMap = new ConcurrentHashMap<>();
-     * this.publisherStatusMap = new ConcurrentHashMap<>();
-     * 
-     * // Sample data for publisherStatusMap
-     * publisherStatusMap.put("Handbags", "active"); // Status: Connected
-     * publisherStatusMap.put("Watches", "inactive"); // Status: Disconnected
-     * publisherStatusMap.put("Jewellery", "active"); // Status: Connected
-     * 
-     * EventData event = new EventData();
-     * event.setEventId(1);
-     * event.setEventLocation("Milpitas");
-     * event.setMessage("Coach sale 50 percent");
-     * event.setOccasion("Thanksgiving");
-     * event.setPublisherId("Handbags");
-     * 
-     * publisherEventDataMap.put("Handbags", event);
-     * 
-     * }
-     */
-    // added @Manjula Mynampati
     private final ReentrantLock lock = new ReentrantLock();
 
     private Logger logger = Logger.getLogger(BrokerNodeController.class.getName());
@@ -97,15 +65,12 @@ public class BrokerNodeController {
 
     @Value("${config.server.url}")
     private String configServerUrl;
-    // In application.properties:
-    // server.port=8080
-    // config.server.url=http://3.223.147.155:8080/
 
     private final RestTemplate restTemplate = new RestTemplate();
 
     private Broker broker;
 
-    private String currentLeaderBrokerPrivateIP; // now will refer to public IPv4 address
+    private String currentLeaderBrokerPrivateIP;
     // Flag to track whether leader IP check is needed
     private boolean leaderIPCheckNeeded = true;
 
@@ -113,12 +78,11 @@ public class BrokerNodeController {
     public void triggerRegistration() {
         // Create a sample Broker object with necessary information
         this.broker = new Broker();
-        // You may set other properties of the broker object as needed
 
         // Trigger registration with the configuration server
         System.out.println("Registering with coordinator server...");
-
         registerWithConfigServer(this.broker);
+
         currentLeaderBrokerPrivateIP = getLeaderPrivateIPFromConfigServer();
 
         updateLeaderStatus();
@@ -152,15 +116,12 @@ public class BrokerNodeController {
         try {
             System.out.println("Registering broker node with Coordinator Server...");
             logger.log(Level.INFO, "Registering broker node with Coordinator Server...");
-            // broker.setIpAddress(InetAddress.getLocalHost().getHostAddress());//sets the
-            // private IP address
+
             String privateIpAddress = EC2MetadataUtils.getInstanceInfo().getPrivateIp();
-            // // private IP of currrent EC2
 
             broker.setIpAddress(privateIpAddress);
             broker.setPort(port); // Set the injected port 8080
             broker.setUniqueId(50);
-            // RestTemplate restTemplate = new RestTemplate();
 
             // Retrieve EC2 instance ID dynamically using AWS EC2 Metadata Service
             String ec2InstanceId = EC2MetadataUtils.getInstanceId();
@@ -170,7 +131,7 @@ public class BrokerNodeController {
 
             restTemplate.postForObject(configServerUrl + "/register-broker", broker, Void.class);
             System.out.println(
-                    "broker node with uniqueID: " + broker.getUniqueId() + "has sent registeration request to server");
+                    "Broker node with uniqueID: " + broker.getUniqueId() + "has sent registeration request to server");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -188,8 +149,7 @@ public class BrokerNodeController {
         } else {
             return "Hello, World! BrokerServer is up & running!";
         }
-        // return "Hello, World! BrokerServer is up & running! uniqueID: " +
-        // broker.getUniqueId();
+
     }
 
     @DeleteMapping("/deregister/{uniqueId}")
@@ -206,22 +166,11 @@ public class BrokerNodeController {
     public void handleUpdateLeaderIPAndCheckStatus(@RequestBody String requestBody) {
         JSONObject jsonObject = new JSONObject(requestBody);
         String newLeadBrokerPrivateIPAddress = jsonObject.getString("newLeadBrokerPrivateIPAddress");
-        // System.out.println("Received new lead broker private IP address: " +
-        // newLeadBrokerPrivateIPAddress);
+
         this.currentLeaderBrokerPrivateIP = newLeadBrokerPrivateIPAddress;
         this.leaderIPCheckNeeded = true;
         updateLeaderStatus();
     }
-
-    /*
-     * @PostMapping("/updateCurrentNode-leaderIPValue")
-     * public void updateLeaderIP(@RequestBody String leaderPrivateIP) {
-     * // Update the current leader's private IP with the value received in the
-     * request
-     * this.currentLeaderBrokerPrivateIP = leaderPrivateIP;
-     * updateLeaderStatus();
-     * }
-     */
 
     // Method to retrieve the private IP of the leader broker from config server
     private String getLeaderPrivateIPFromConfigServer() {
@@ -382,133 +331,11 @@ public class BrokerNodeController {
         // Deregister from the config server before the instance terminates
     }
 
-    // move from other file begins here
-    // Scheduled method to check if /pushEvent was hit every minute
-
-    // Stopped this execution for initial publisher check
-    // @Scheduled(fixedRate = 60000) // 60 seconds = 1 minute
-    /*
-     * public void checkAndNotifySubscribers() {
-     * 
-     * boolean isLeader = broker.isLeader();
-     * System.out.println("leader status in BrokerController: " + isLeader);
-     * System.out.flush();
-     * if (isLeader) {
-     * for (Map.Entry<String, EventData> entry : publisherEventDataMap.entrySet()) {
-     * String publisherId = entry.getKey();
-     * EventData event = entry.getValue();
-     * 
-     * if (event != null) {
-     * List<SubscriberModel> subscribers =
-     * publisherSubscriberMap.getOrDefault(publisherId,
-     * new ArrayList<>());
-     * boolean success = notifySubscriber(subscribers, event);
-     * lock.lock();
-     * try {
-     * if (success) {
-     * // Remove the event after successfully notifying subscribers
-     * // Radhika: You cannot update the publisherEventDataMap while you are
-     * iterating
-     * // it. Update the final map later.
-     * // publisherEventDataMap.remove(publisherId); //Radhika: Commented as its
-     * wrong!
-     * System.out.println("Notified subscribers for event from publisher: " +
-     * publisherId);
-     * logger.log(Level.INFO,
-     * "Notified subscribers for event from publisher: \" + publisherId");
-     * 
-     * boolean result = sendEventDataToPeerBrokers(publisherEventDataMap); //
-     * Consistency &
-     * // Replication
-     * if (result) {
-     * System.out.println("Successfully sent publisherEventDataMap to peer brokers"
-     * );
-     * logger.log(Level.INFO,
-     * "Successfully sent publisherEventDataMap to peer brokers");
-     * } else {
-     * System.out.
-     * println("Failed to notify peer brokers about publisherEventDataMap");
-     * logger.log(Level.INFO,
-     * "Failed to notify peer brokers about publisherEventDataMap");
-     * }
-     * } else {
-     * System.out.println("Failed to notify subscribers for event from publisher: "
-     * + publisherId);
-     * logger.log(Level.INFO,
-     * "Failed to notify subscribers for event from publisher: \" + publisherId");
-     * 
-     * }
-     * } catch (Exception e) {
-     * e.printStackTrace();
-     * } finally {
-     * lock.unlock();
-     * }
-     * }
-     * }
-     * }
-     * 
-     * }
-     */
-
-    /*
-     * @Scheduled(fixedRate = 60000) // 60 seconds = 1 minute
-     * public void checkAndNotifySubscribers() {
-     * 
-     * boolean isLeader = broker.isLeader();
-     * System.out.println("isLeader flag value: " + isLeader);
-     * if (isLeader) {
-     * publisherEventDataMap.forEach((publisherId, event) -> {
-     * if (event != null) {
-     * List<SubscriberModel> subscribers =
-     * publisherSubscriberMap.getOrDefault(publisherId,
-     * new ArrayList<>());
-     * 
-     * if (!subscribers.isEmpty()) {
-     * boolean success = notifySubscriber(subscribers, event);
-     * 
-     * lock.lock();
-     * try {
-     * if (success) {
-     * // Remove the event after successfully notifying subscribers
-     * publisherEventDataMap.compute(publisherId, (key, value) -> null);
-     * System.out.println("Notified subscribers for event from publisher: " +
-     * publisherId);
-     * 
-     * boolean result = sendEventDataToPeerBrokers(publisherEventDataMap); //
-     * Consistency &
-     * // Replication
-     * 
-     * if (result) {
-     * System.out.println("Successfully sent publisherEventDataMap to peer brokers"
-     * );
-     * } else {
-     * System.out.
-     * println("Failed to notify peer brokers about publisherEventDataMap");
-     * }
-     * } else {
-     * System.out.println(
-     * "Failed to notify subscribers for event from publisher: " + publisherId);
-     * }
-     * } catch (Exception e) {
-     * e.printStackTrace();
-     * } finally {
-     * lock.unlock();
-     * }
-     * }
-     * } else {
-     * System.out.println("No Events to be posted: ");
-     * }
-     * });
-     * }
-     * 
-     * }
-     */
-
     @Scheduled(fixedRate = 60000) // 60 seconds = 1 minute
     public void checkAndNotifySubscribers() {
 
         boolean isLeader = broker.isLeader();
-        System.out.println("isLeader flag value: " + isLeader);
+
         if (isLeader) {
             Iterator<Map.Entry<String, EventData>> iterator = publisherEventDataMap.entrySet().iterator();
             while (iterator.hasNext()) {
@@ -555,8 +382,6 @@ public class BrokerNodeController {
 
     }
 
-    // This method is coming from subscriber to fetch list of active publishers
-    // @Manjula Mynampati
     @GetMapping(value = "/getPublishers")
     public ResponseEntity<List<String>> getPublishers() {
         System.out.println("in getPublishers method");
@@ -580,8 +405,6 @@ public class BrokerNodeController {
         return ResponseEntity.ok(activePublishers);
     }
 
-    // This method is coming from subscriber to subscribe list of subscribers
-    // @Manjula Mynampati
     @PostMapping(value = "/subscribe")
     public ResponseEntity<HttpStatus> subscribe(@RequestBody SubscriberModel subscriberModel) throws Exception {
 
@@ -620,15 +443,13 @@ public class BrokerNodeController {
             logger.log(Level.INFO,
                     "throwing exception e in /subscribe");
             throw e;
-            // e.printStackTrace();
-            // return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+
         } finally {
             lock.unlock();
         }
 
     }
 
-    // this method should be called from lead Broker
     public boolean notifySubscriber(List<SubscriberModel> subscribers, EventData event) {
 
         boolean flag = brokerService.notify(subscribers, event);
@@ -637,9 +458,6 @@ public class BrokerNodeController {
 
     }
 
-    // sending publisherSubscriberMap to peer brokers for subscribe
-    // @ManjulaMynampati
-    // Updated code to handle concurrentHashMap- Radhika
     private boolean sendMapToPeerBrokers(ConcurrentHashMap<String, List<SubscriberModel>> publisherSubscriberMap)
             throws Exception {
 
@@ -648,7 +466,7 @@ public class BrokerNodeController {
 
         boolean flag = false;
         List<String> peerBrokersIpList = getPeerIpsFromConfigServer();
-        // verifying if peerBrokerIPList is not empty --Radhika
+
         if (publisherSubscriberMap != null) {
             if (peerBrokersIpList.size() != 0) {
 
@@ -708,8 +526,6 @@ public class BrokerNodeController {
         return flag;
     }
 
-    // sending event data to peer brokers @ManjulaMynampati
-    // updated to handle ConcurrentHashMap -Radhika
     private boolean sendEventDataToPeerBrokers(ConcurrentHashMap<String, EventData> publisherEventDataMap)
             throws Exception {
 
@@ -722,7 +538,7 @@ public class BrokerNodeController {
                 String peerurl = "http://" + peerBrokerIP + ":" + Integer.parseInt(ec2Port) + "/receiveEventData";
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.APPLICATION_JSON);
-                // updated below to handle ConcurrentHashMap -Radhika
+
                 HttpEntity<ConcurrentHashMap> requestEntity = new HttpEntity<>(publisherEventDataMap, headers);
                 System.out.println("Sending publisherEventDataMap to peerBroker at url " + peerurl);
                 System.out.flush();
@@ -749,14 +565,12 @@ public class BrokerNodeController {
             }
         } else {
             System.out.println("peerbrokeripList is null");
-            System.out.flush();
+
         }
 
         return flag;
     }
 
-    // getting peer brokers ip from config server method to be updated
-    // @ManjulaMynampati
     public List<String> getPeerIpsFromConfigServer() {
         List<String> peerBrokersIpList = new ArrayList<>();
         String configUrl = "http://" + configIp + ":" + ec2Port;
@@ -780,15 +594,7 @@ public class BrokerNodeController {
                 }
             } else {
                 System.err.println(
-                        "Failed to fetch peer broker IP list. Status code: " + responseEntity.getStatusCode());// updated
-                                                                                                               // to
-                                                                                                               // getStatusCode()
-                                                                                                               // as
-                                                                                                               // getStatusCodeValue()
-                                                                                                               // is
-                                                                                                               // deprecated
-                                                                                                               // -->
-                                                                                                               // Radhika
+                        "Failed to fetch peer broker IP list. Status code: " + responseEntity.getStatusCode());
                 System.out.flush();
             }
 
@@ -799,8 +605,6 @@ public class BrokerNodeController {
         return peerBrokersIpList;
     }
 
-    // receiving method to peerbrokers that publisherSubscriberMap is updated
-    // @ManjulaMynampati
     @PostMapping("/receiveEventData")
     public ResponseEntity<String> receiveEventData(@RequestBody ConcurrentHashMap<String, EventData> receivedMap) {
 
@@ -814,12 +618,12 @@ public class BrokerNodeController {
             System.out.flush();
             for (String publisherId : publisherEventDataMap.keySet()) {
                 EventData event = publisherEventDataMap.get(publisherId);
-                // System.out.println("/n");
-                System.out.println("\n"); // fixed the "\" --radhika
+
+                System.out.println("\n");
                 System.out.println("Publisher ID: " + publisherId);
                 System.out.println("EventId: " + event.getEventId());
-                // System.out.println("/n");
-                System.out.println("\n"); // fixed the "\" --radhika
+
+                System.out.println("\n");
             }
 
             return ResponseEntity.ok("");
@@ -831,8 +635,6 @@ public class BrokerNodeController {
         }
     }
 
-    // receiving method to peerbrokers that publisherSubscriberMap is updated
-    // @ManjulaMynampati
     @PostMapping("/receiveHashMapUpdate")
     public ResponseEntity<String> receiveHashMapUpdate(
             @RequestBody ConcurrentHashMap<String, List<SubscriberModel>> receivedMap) {
@@ -903,12 +705,7 @@ public class BrokerNodeController {
         }
 
     }
-    /*
-     * @Shreya Krishnamoorthy
-     */
 
-    // sending publisherStatusMap to peer brokers for subscribe @Shreya
-    // Krishnamoorthy
     private boolean sendStatusMapToPeerBrokers(ConcurrentHashMap<String, String> publisherStatusMap) throws Exception {
         System.out.println("entering the sendStatusMapToPeerBrokers function");
         boolean flag = false;
@@ -920,7 +717,7 @@ public class BrokerNodeController {
                             + "/receiveStatusMapUpdate";
                     HttpHeaders headers = new HttpHeaders();
                     headers.setContentType(MediaType.APPLICATION_JSON);
-                    // changed HashMap to concurrent Hashmap
+
                     HttpEntity<ConcurrentHashMap> requestEntity = new HttpEntity<>(publisherStatusMap, headers);
                     System.out.println("Sending publisherStatusMap to peerBroker at url " + peerurl);
                     System.out.flush();
@@ -957,8 +754,6 @@ public class BrokerNodeController {
         return flag;
     }
 
-    // receiving method to peerbrokers that publisherStatusMap is updated @Shreya
-    // Krishnamoorthy
     @PostMapping("/receiveStatusMapUpdate")
     public ResponseEntity<String> receiveStatusMapUpdate(@RequestBody ConcurrentHashMap<String, String> receivedMap) {
 
@@ -984,8 +779,6 @@ public class BrokerNodeController {
         }
     }
 
-    // This method is coming from publisher to change its status @Shreya
-    // Krishnamoorthy
     @PostMapping(value = "/changePublisherStatus")
     public ResponseEntity<HttpStatus> changePublisherStatus(@RequestBody PublisherModel publisherModel) {
 
@@ -1013,7 +806,7 @@ public class BrokerNodeController {
             if (success) {
                 System.out.println("Publisher name: " + publisherId + "| Status changed to: " + status);
                 System.out.flush();
-                // return ResponseEntity.ok(HttpStatus.OK);
+
                 return ResponseEntity.ok().build();
 
             } else {
@@ -1022,7 +815,7 @@ public class BrokerNodeController {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
             }
         } catch (Exception e) {
-            // Log and handle the exception
+
             System.out.println("An error occurred while processing the request: " + e.getMessage());
             System.out.flush();
             e.printStackTrace();
@@ -1032,8 +825,6 @@ public class BrokerNodeController {
         }
     }
 
-    // This method is coming from publisher to add publisher to the broker system
-    // @Shreya Krishnamoorthy
     @PostMapping(value = "/addPublisher")
     public ResponseEntity<String> addPublisher(@RequestBody PublisherModel publisherModel) throws Exception {
 
@@ -1049,7 +840,7 @@ public class BrokerNodeController {
             if (!publisherSubscriberMap.containsKey(publisherId)) {
                 publisherSubscriberMap.put(publisherId, new ArrayList<>());
             }
-            System.out.println("sending the updated map to peer broker: ");
+            System.out.println("Sending the updated map to peer broker: ");
             System.out.flush();
             successForSubscriberMap = sendMapToPeerBrokers(publisherSubscriberMap); //
             // consistency & Replication
@@ -1073,10 +864,7 @@ public class BrokerNodeController {
             }
 
         } catch (Exception e) {
-            /*
-             * e.printStackTrace();
-             * return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-             */
+
             throw e;
         } finally {
             lock.unlock();
@@ -1084,8 +872,6 @@ public class BrokerNodeController {
 
     }
 
-    // This method is coming from publisher to push its event to the broker @Shreya
-    // Krishnamoorthy
     @PostMapping(value = "/pushEvent")
     public ResponseEntity<HttpStatus> pushEvent(@RequestBody EventData eventData) {
         String publisherId = eventData.getPublisherId();
@@ -1104,4 +890,3 @@ public class BrokerNodeController {
         }
     }
 }
-// push event is not sending the event data to peer IP address
